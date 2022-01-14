@@ -1,6 +1,8 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <LiquidCrystal.h>
+
+
 LiquidCrystal lcd(7, 6, 5, 4, 3, 2);
 
 #define INF 1294967295   //big enough and does not overflow at addition on int
@@ -64,6 +66,9 @@ void setup() {
   
   TCCR0B|=(1<<CS01);    //Set the prescale 1/64 clock
   TCCR0B|=(1<<CS00);
+  lcd.print("Welcome");
+  lcd.setCursor(0,1);
+  lcd.print("Wait for start");
 
 }
 
@@ -82,7 +87,6 @@ ISR(TIMER0_COMPA_vect){    //This is the interrupt request
     analogWrite(led_pin, 150);
     buzzerPeriod = 250;
     buzzerDelay--;
-    game_started = true;
     timer = 0;
     starting_time = timer;
   }
@@ -90,6 +94,8 @@ ISR(TIMER0_COMPA_vect){    //This is the interrupt request
   else if(buzzerPeriod > 0)
   {
         buzzerPeriod--;
+            game_started = true;
+
   }
    else if (buzzerPeriod == 0){
       buzzerPeriod--;
@@ -97,21 +103,20 @@ ISR(TIMER0_COMPA_vect){    //This is the interrupt request
       analogWrite(BUZZER_PIN, 0);
       analogWrite(led_pin, 0);
     }
-   else if((timer - starting_time == MAX_GAME_DURATION) && !game_ended)
-  {
-    timeout = true;
-  }
   
 
 }
 
 void reset_button_state()
 {
-
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Waiting");
   start_pressed_but = false;
   player_1_pressed_but = false;
   player_2_pressed_but = false;
-  roundNr++;
+  game_started = false;
+
 
 }
 
@@ -121,9 +126,6 @@ void start_game(){
   start_pressed_but = true;
     game_started = false;
 
-    Serial.println(reaction[roundNr][0]);
-  
-    Serial.println(reaction[roundNr][1]);
   lcd.setCursor(0,0);
   game_ended = false;
   foul[0] = false;
@@ -142,12 +144,17 @@ void loop() {
   
   if(((reaction[roundNr][0] != INF || foul[0]) && (reaction[roundNr][1] != INF || foul[1]) && !game_ended && game_started) || timeout)
     {
-      Serial.println(game_ended);
-  Serial.println(game_started);
+
 
       game_ended = true;
       printRoundResults(roundNr);
       //game ended, print results
+        if(roundNr == 2)
+        {
+          computeAvg();
+        }      
+        roundNr++;
+
     }
     
 }
@@ -208,8 +215,7 @@ void printRoundResults(int nr)
   lcd.clear();
   for(int i = 0; i < NO_PLAYERS; ++i)
   {
-    Serial.println(timeout);
-    Serial.println(reaction[nr][i] );
+
     if(reaction[nr][i] != INF)
     {
       lcd.setCursor(0, i);
@@ -221,6 +227,7 @@ void printRoundResults(int nr)
       {
         lcd.setCursor(13, i);
         lcd.print("Win");
+        wins[i] += 1;
       }
       else
       {
@@ -238,25 +245,66 @@ void printRoundResults(int nr)
       }
     }
     else if(foul[i]){
+      lcd.setCursor(0, i);
       lcd.print("P");
       lcd.print(i+1);
       lcd.print("   FOUL");
-      
+    }
+
+  }
+}
+
+  void computeAvg()
+  {
+    long totalMilis = 0;
+    for(int i = 0; i < NO_ROUNDS; i++)
+    {
+      if(reaction[i][0] != INF)
+        totalMilis += reaction[i][0];
+      else
+        totalMilis += 5000;
+
+    }
+    avg[0] = ((float)totalMilis) / NO_ROUNDS;
+    totalMilis = 0;
+    for(int i = 0; i < NO_ROUNDS; i++)
+    {
+
+      if(reaction[i][1] != INF)
+        totalMilis += reaction[i][1];
+      else
+        totalMilis += 5000;
+    }
+    avg[1] = ((float)totalMilis) / NO_ROUNDS;
+
+    Serial.print("Player one has an average response time of ");
+    Serial.print(avg[0]);
+    Serial.print(" milliseconds");
+    Serial.println("");
+    Serial.print("Player two has an average response time of ");
+    Serial.print(avg[1]);
+    Serial.print(" milliseconds");
+
+    if(wins[1] == wins[2])
+    {
+      Serial.println("");
+      Serial.println("");
+      Serial.print("DRAW");
     }
     else
     {
-      lcd.print("P");
-      lcd.print(i+1);
-      lcd.print("   DNF");
+      Serial.println("");
+      Serial.println("");
+      Serial.print("The winner is the Player ");
+      if(wins[1] > wins[2])
+      {
+        Serial.print("one");
+      }
+      else
+      {
+        Serial.print("two");
+      }
     }
-  //print "Win" or "Draw"
-  //printOutcome();
-  //print the time difference between winner and loser.
-  //Print it on the row with the loser.
-  //if one of the players has made a fault do not print the time difference
- // if(reaction[nr][0] != INF && reaction[nr][1] != INF) {
-  //  if(reaction[nr][0] > reaction[nr][1]) lcd.setCursor(10, 0);
-  //  else lcd.setCursor(10, 1);
-    //lcd.printf("%+6d", abs(reaction[nr][0] - reaction[nr][1]));
-  }
+
 }
+
