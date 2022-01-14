@@ -2,7 +2,6 @@
 #include <avr/interrupt.h>
 #include <LiquidCrystal.h>
 
-
 LiquidCrystal lcd(7, 6, 5, 4, 3, 2);
 
 #define INF 1294967295   //big enough and does not overflow at addition on int
@@ -34,7 +33,7 @@ volatile long timer = 0;
 volatile long starting_time;
 volatile long reaction[NO_ROUNDS][NO_PLAYERS] = {{INF, INF},{INF,INF},{INF,INF}};//store the reaction in every round for every player
 volatile int wins[NO_PLAYERS];//wins[i] - number of rounds won by player i
-volatile float avg[NO_PLAYERS];//avg[i] - the average response time of player i
+long avg[NO_PLAYERS];//avg[i] - the average response time of player i
 volatile bool roundStarted;//true if a round is in progress
 volatile int roundNr = 0; //current round number
 volatile bool not_pressed[NO_PLAYERS];//not_pressed[i] == 1 if player i has not pressed his button in current round
@@ -44,6 +43,7 @@ volatile bool timeout = false;
 
 void setup() {
   Serial.begin(9600);
+  Serial2.begin(9600);
   pinMode(PLAYER_0, INPUT);
   pinMode(PLAYER_1, INPUT);
   pinMode(START_BUT, INPUT);
@@ -103,8 +103,6 @@ ISR(TIMER0_COMPA_vect){    //This is the interrupt request
       analogWrite(BUZZER_PIN, 0);
       analogWrite(led_pin, 0);
     }
-  
-
 }
 
 void reset_button_state()
@@ -265,7 +263,7 @@ void printRoundResults(int nr)
         totalMilis += 5000;
 
     }
-    avg[0] = ((float)totalMilis) / NO_ROUNDS;
+    avg[0] = (totalMilis) / NO_ROUNDS;
     totalMilis = 0;
     for(int i = 0; i < NO_ROUNDS; i++)
     {
@@ -275,36 +273,35 @@ void printRoundResults(int nr)
       else
         totalMilis += 5000;
     }
-    avg[1] = ((float)totalMilis) / NO_ROUNDS;
+    avg[1] = (totalMilis) / NO_ROUNDS;
 
-    Serial.print("Player one has an average response time of ");
-    Serial.print(avg[0]);
-    Serial.print(" milliseconds");
-    Serial.println("");
-    Serial.print("Player two has an average response time of ");
-    Serial.print(avg[1]);
-    Serial.print(" milliseconds");
+    Serial2.write("Player one has an average response time of ");
+    Serial2.write(avg[0]);
+    Serial2.write(" milliseconds");
+    Serial2.write('\n');
+    Serial2.write("Player two has an average response time of ");
+    Serial2.write( avg[1]);
+    Serial2.write(" milliseconds");
 
     if(wins[1] == wins[2])
     {
-      Serial.println("");
-      Serial.println("");
-      Serial.print("DRAW");
+      Serial2.write('\n');
+      Serial2.write('\n');
+      Serial2.write("DRAW");
     }
     else
     {
-      Serial.println("");
-      Serial.println("");
-      Serial.print("The winner is the Player ");
+      Serial2.write('\n');
+      Serial2.write('\n');
+      Serial2.write("The winner is the Player ");
       if(wins[1] > wins[2])
       {
-        Serial.print("one");
+        Serial2.write("one");
       }
       else
       {
-        Serial.print("two");
+        Serial2.write("two");
       }
     }
 
 }
-
